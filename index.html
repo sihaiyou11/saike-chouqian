@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>赛课抽签系统 - 在线版</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #fff; min-height: 100vh; padding: 20px; }
+.container { max-width: 1200px; margin: 0 auto; }
+h1 { text-align: center; color: #e94560; margin-bottom: 20px; font-size: 2.2em; text-shadow: 0 0 20px rgba(233,69,96,0.5); }
+.box { background: rgba(255,255,255,0.08); backdrop-filter: blur(10px); border-radius: 15px; padding: 25px; margin: 20px 0; border: 1px solid rgba(255,255,255,0.1); }
+h3 { color: #e94560; margin-bottom: 15px; font-size: 1.3em; }
+h4 { color: #4a90a4; margin: 15px 0 10px 0; font-size: 1.1em; }
+p { margin: 8px 0; line-height: 1.6; }
+label { display: block; margin: 10px 0 5px 0; color: #aab; font-size: 14px; }
+input, textarea { width: 100%; padding: 12px; font-size: 14px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; }
+input:focus, textarea:focus { outline: none; border-color: #e94560; }
+textarea { height: 120px; resize: vertical; font-family: 'Consolas', monospace; }
+input[type="number"] { width: 80px; }
+input[type="file"] { display: none; }
+select { padding: 10px; font-size: 14px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; cursor: pointer; width: 100%; }
+select option { background: #1a1a2e; color: #fff; }
+button { padding: 12px 24px; font-size: 15px; cursor: pointer; background: linear-gradient(135deg, #e94560 0%, #c23152 100%); color: #fff; border: none; border-radius: 8px; margin: 8px 5px 8px 0; font-weight: bold; transition: all 0.3s; box-shadow: 0 4px 15px rgba(233,69,96,0.4); }
+button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(233,69,96,0.6); }
+button.secondary { background: linear-gradient(135deg, #4a90a4 0%, #357a8c 100%); box-shadow: 0 4px 15px rgba(74,144,164,0.4); }
+button.warning { background: linear-gradient(135deg, #f39c12 0%, #d68910 100%); box-shadow: 0 4px 15px rgba(243,156,18,0.4); }
+button.success-btn { background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%); box-shadow: 0 4px 15px rgba(76,175,80,0.4); }
+button.danger { background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); box-shadow: 0 4px 15px rgba(231,76,60,0.4); }
+.grade-config { display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0; }
+.grade-item { background: rgba(0,0,0,0.3); padding: 10px 15px; border-radius: 8px; display: flex; align-items: center; gap: 8px; }
+.grade-item label { margin: 0; color: #aab; font-size: 14px; }
+.btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+#log { background: rgba(0,0,0,0.6); color: #0f0; padding: 15px; margin: 10px 0; height: 120px; overflow: auto; font-family: 'Consolas', monospace; font-size: 12px; border-radius: 8px; border: 1px solid rgba(0,255,0,0.2); white-space: pre-wrap; }
+.success { color: #4caf50; font-weight: bold; }
+.error { color: #e94560; font-weight: bold; }
+.note { background: rgba(233,69,96,0.1); border-left: 3px solid #e94560; padding: 10px 15px; margin: 10px 0; border-radius: 0 8px 8px 0; font-size: 14px; }
+.note-success { background: rgba(76,175,80,0.1); border-left: 3px solid #4caf50; padding: 10px 15px; margin: 10px 0; border-radius: 0 8px 8px 0; font-size: 14px; }
+.hidden { display: none; }
+.role-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; margin-left: 10px; }
+.role-admin { background: #e94560; }
+.role-participant { background: #4a90a4; }
+.table-container { overflow-x: auto; margin: 15px 0; }
+table { width: 100%; border-collapse: collapse; background: rgba(0,0,0,0.3); border-radius: 8px; overflow: hidden; }
+th, td { padding: 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+th { background: rgba(233,69,96,0.2); color: #e94560; font-weight: bold; }
+tr:hover { background: rgba(255,255,255,0.05); }
+.action-btn { padding: 6px 12px; font-size: 12px; margin: 2px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>赛课抽签系统 - 在线版</h1>
+
+  <!-- 首页 -->
+  <div id="homePage" class="box">
+    <h3>选择身份</h3>
+    <p style="color: #aab; margin-bottom: 20px;">请选择您的身份进入系统</p>
+    <div class="btn-group">
+      <button onclick="showAdminLogin()">我是发起人（管理员）</button>
+      <button class="secondary" onclick="showParticipantJoin()">我是抽签人</button>
+    </div>
+  </div>
+
+  <!-- 管理员登录 -->
+  <div id="adminLoginPage" class="box hidden">
+    <h3>管理员登录</h3>
+    <label>房间ID（已有房间请输入，留空则创建新房间）</label>
+    <input type="text" id="adminRoomId" placeholder="留空则创建新房间">
+    <label>管理员密码</label>
+    <input type="password" id="adminToken" placeholder="创建或管理房间需要密码">
+    <div class="btn-group">
+      <button onclick="adminLogin()">进入管理</button>
+      <button class="secondary" onclick="showHome()">返回首页</button>
+    </div>
+  </div>
+
+  <!-- 参与者加入 -->
+  <div id="participantJoinPage" class="box hidden">
+    <h3>参与抽签</h3>
+    <label>房间ID</label>
+    <input type="text" id="participantRoomId" placeholder="请输入房间ID">
+    <div class="btn-group">
+      <button onclick="participantJoin()">进入房间</button>
+      <button class="secondary" onclick="showHome()">返回首页</button>
+    </div>
+  </div>
+
+  <!-- 管理员页面 -->
+  <div id="adminPage" class="box hidden">
+    <h3>管理员控制台 <span class="role-badge role-admin">管理员</span></h3>
+    <p>房间ID：<code id="displayRoomId" style="background: rgba(233,69,96,0.2); padding: 2px 8px; border-radius: 4px;"></code></p>
+    <p>分享链接：<p id="shareLink" style="background: rgba(74,144,164,0.2); padding: 10px; border-radius: 4px; cursor: pointer; word-break: break-all;" onclick="copyShareLink()"></p>
+    
+    <h4>班级配置</h4>
+    <div class="grade-config">
+      <div class="grade-item"><label>一年级：<input type="number" id="g1" value="2" min="1" max="20"></label></div>
+      <div class="grade-item"><label>二年级：<input type="number" id="g2" value="2" min="1" max="20"></label></div>
+      <div class="grade-item"><label>三年级：<input type="number" id="g3" value="3" min="1" max="20"></label></div>
+      <div class="grade-item"><label>四年级：<input type="number" id="g4" value="3" min="1" max="20"></label></div>
+      <div class="grade-item"><label>五年级：<input type="number" id="g5" value="3" min="1" max="20"></label></div>
+      <div class="grade-item"><label>六年级：<input type="number" id="g6" value="2" min="1" max="20"></label></div>
+    </div>
+
+    <h4>导入教师名单</h4>
+    <div class="btn-group">
+      <button class="secondary" onclick="downloadTemplate()">下载Excel模板</button>
+      <button class="secondary" onclick="document.getElementById('importFile').click()">导入名单</button>
+      <input type="file" id="importFile" accept=".xlsx,.xls,.csv,.txt" onchange="importTeachers(event)">
+    </div>
+    <textarea id="roster" placeholder="姓名,科目,年级&#10;张三,语文,三年级&#10;李四,数学,4年级"></textarea>
+    <div class="btn-group">
+      <button onclick="saveRoster()">保存花名册</button>
+      <button class="warning" onclick="clearRoster()">清空</button>
+    </div>
+
+    <h4>抽签操作</h4>
+    <div class="btn-group">
+      <button onclick="startDraw()">开始抽签</button>
+      <button class="warning" onclick="redraw()">重新抽签</button>
+      <button class="danger" onclick="resetAll()">重置所有结果</button>
+    </div>
+
+    <h4>抽签结果</h4>
+    <div id="adminResultTable"></div>
+
+    <h4>导出与分享</h4>
+    <div class="btn-group">
+      <button class="success-btn" onclick="exportResults()">导出Excel</button>
+      <button class="secondary" onclick="shareToWechat()">分享到微信</button>
+      <button class="secondary" onclick="copyShareLink()">复制链接</button>
+    </div>
+  </div>
+
+  <!-- 参与者页面 -->
+  <div id="participantPage" class="box hidden">
+    <h3>抽签界面 <span class="role-badge role-participant">抽签人</span></h3>
+    <p>房间ID：<code id="displayParticipantRoomId" style="background: rgba(74,144,164,0.2); padding: 2px 8px; border-radius: 4px;"></code></p>
+    
+    <h4>抽签</h4>
+    <select id="teacherSelect">
+      <option value="">-- 请选择您的姓名 --</option>
+    </select>
+    <div class="btn-group">
+      <button onclick="participantDraw()">开始抽签</button>
+    </div>
+    
+    <h4>抽签结果</h4>
+    <div id="participantResult"></div>
+    
+    <h4>已抽签名单</h4>
+    <div id="participantDrawnList"></div>
+  </div>
+
+  <!-- 调试日志 -->
+  <div class="box">
+    <h3>调试日志</h3>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script>
+var SUPABASE_URL = 'https://rtumrtlmznlktfnrkxuh.supabase.co';
+var SUPABASE_KEY = 'sb_publishable_D8uyF9JbxJLIwIn2V0uHmg_25nuwqCJ';
+var db = null;
+
+var currentRoomId = '';
+var currentToken = '';
+var isAdmin = false;
+var teachers = [];
+var gradeClassCount = {};
+var classPools = {};
+var usedSeqs = [];
+
+function log(msg) {
+  var d = document.getElementById('log');
+  if (!d) return;
+  var t = new Date().toLocaleTimeString();
+  d.innerHTML += '[' + t + '] ' + msg + '\n';
+  d.scrollTop = d.scrollHeight;
+}
+
+// 初始化 Supabase
+function initSupabase() {
+  try {
+    if (window.supabase && window.supabase.createClient) {
+      db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      log('Supabase 初始化成功');
+    } else {
+      log('错误：Supabase 库未加载');
+    }
+  } catch (e) {
+    log('Supabase 初始化失败：' + e.message);
+  }
+}
+
+// 页面切换
+function showHome() {
+  hideAllPages();
+  document.getElementById('homePage').classList.remove('hidden');
+}
+
+function showAdminLogin() {
+  hideAllPages();
+  document.getElementById('adminLoginPage').classList.remove('hidden');
+}
+
+function showParticipantJoin() {
+  hideAllPages();
+  document.getElementById('participantJoinPage').classList.remove('hidden');
+}
+
+function showAdminPage() {
+  hideAllPages();
+  document.getElementById('adminPage').classList.remove('hidden');
+}
+
+function showParticipantPage() {
+  hideAllPages();
+  document.getElementById('participantPage').classList.remove('hidden');
+}
+
+function hideAllPages() {
+  document.getElementById('homePage').classList.add('hidden');
+  document.getElementById('adminLoginPage').classList.add('hidden');
+  document.getElementById('participantJoinPage').classList.add('hidden');
+  document.getElementById('adminPage').classList.add('hidden');
+  document.getElementById('participantPage').classList.add('hidden');
+}
+
+// 年级处理
+function normalizeGrade(gradeStr) {
+  if (!gradeStr) return 0;
+  var s = gradeStr.trim();
+  var cnNums = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+  var match = s.match(/([一二三四五六七八九十\d]+)/);
+  if (!match) return 0;
+  var numStr = match[1];
+  if (cnNums[numStr]) return cnNums[numStr];
+  var num = parseInt(numStr);
+  return isNaN(num) ? 0 : num;
+}
+
+function generateClassName(gradeNum, classNum) {
+  var gradeNames = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+  var gradeName = gradeNames[gradeNum] || gradeNum;
+  return gradeName + '年级(' + classNum + ')班';
+}
+
+function initClassPool(gradeNum) {
+  var count = gradeClassCount[gradeNum] || 2;
+  var pool = { available: [], used: [] };
+  for (var i = 1; i <= count; i++) {
+    pool.available.push(generateClassName(gradeNum, i));
+  }
+  classPools[gradeNum] = pool;
+}
+
+function drawClassFromPool(gradeNum) {
+  var pool = classPools[gradeNum];
+  if (!pool) { initClassPool(gradeNum); pool = classPools[gradeNum]; }
+  if (pool.available.length === 0) {
+    pool.available = pool.used.slice();
+    pool.used = [];
+  }
+  var idx = Math.floor(Math.random() * pool.available.length);
+  var cls = pool.available[idx];
+  pool.available.splice(idx, 1);
+  pool.used.push(cls);
+  return cls;
+}
+
+// 管理员登录
+async function adminLogin() {
+  if (!db) {
+    alert('数据库未初始化，请刷新页面重试');
+    return;
+  }
+  
+  var roomId = document.getElementById('adminRoomId').value.trim();
+  var token = document.getElementById('adminToken').value.trim();
+  
+  if (!token) {
+    alert('请输入管理员密码');
+    return;
+  }
+  
+  log('管理员登录中...');
+  
+  if (roomId) {
+    var result = await db.from('rooms').select('*').eq('id', roomId).single();
+    
+    if (result.error || !result.data) {
+      alert('房间不存在');
+      return;
+    }
+    
+    if (result.data.admin_token !== token) {
+      alert('密码错误');
+      return;
+    }
+    
+    currentRoomId = roomId;
+    currentToken = token;
+    isAdmin = true;
+    
+    await loadRoomData();
+    showAdminPage();
+    updateAdminUI();
+  } else {
+    var newRoomId = 'ROOM_' + Date.now();
+    
+    var result = await db.from('rooms').insert({
+      id: newRoomId,
+      name: '赛课抽签',
+      admin_token: token,
+      seq_input: '1,2,3,4,5,6,7,8,9,10',
+      class_input: ''
+    });
+    
+    if (result.error) {
+      alert('创建房间失败：' + result.error.message);
+      return;
+    }
+    
+    currentRoomId = newRoomId;
+    currentToken = token;
+    isAdmin = true;
+    teachers = [];
+    
+    showAdminPage();
+    updateAdminUI();
+    log('房间创建成功：' + newRoomId);
+    alert('房间创建成功！\n房间ID：' + newRoomId + '\n\n请保存房间ID和密码，用于后续管理');
+  }
+}
+
+async function loadRoomData() {
+  log('加载房间数据...');
+  
+  var result = await db.from('teachers').select('*').eq('room_id', currentRoomId).order('created_at', { ascending: true });
+  
+  if (result.error) {
+    log('加载失败：' + result.error.message);
+    return;
+  }
+  
+  teachers = (result.data || []).map(function(t) {
+    return {
+      id: t.id,
+      name: t.name,
+      subject: t.subject || '',
+      gradeStr: t.grade || '',
+      gradeNum: normalizeGrade(t.grade),
+      drawn: t.drawn || false,
+      seq: t.seq || '',
+      cls: t.cls || ''
+    };
+  });
+  
+  usedSeqs = teachers.filter(function(t) { return t.drawn && t.seq; }).map(function(t) { return parseInt(t.seq); });
+  
+  log('加载成功，共 ' + teachers.length + ' 位教师');
+}
+
+function updateAdminUI() {
+  document.getElementById('displayRoomId').textContent = currentRoomId;
+  
+  var shareUrl = window.location.href.split('?')[0] + '?room=' + currentRoomId;
+  document.getElementById('shareLink').textContent = shareUrl;
+  
+  updateAdminResultTable();
+}
+
+function updateAdminResultTable() {
+  var container = document.getElementById('adminResultTable');
+  
+  if (teachers.length === 0) {
+    container.innerHTML = '<p style="color: #aab;">暂无教师数据，请先导入花名册</p>';
+    return;
+  }
+  
+  var html = '<div class="table-container"><table>';
+  html += '<tr><th>姓名</th><th>科目</th><th>年级</th><th>抽签序号</th><th>班级</th><th>状态</th><th>操作</th></tr>';
+  
+  for (var i = 0; i < teachers.length; i++) {
+    var t = teachers[i];
+    html += '<tr>';
+    html += '<td>' + t.name + '</td>';
+    html += '<td>' + (t.subject || '-') + '</td>';
+    html += '<td>' + (t.gradeStr || '-') + '</td>';
+    html += '<td><b>' + (t.seq || '-') + '</b></td>';
+    html += '<td><b>' + (t.cls || '-') + '</b></td>';
+    html += '<td>' + (t.drawn ? '<span class="success">已抽签</span>' : '<span style="color:#aab">未抽签</span>') + '</td>';
+    html += '<td>';
+    if (t.drawn) {
+      html += '<button class="action-btn warning" onclick="redrawTeacher(' + i + ')">重抽</button>';
+      html += '<button class="action-btn danger" onclick="clearTeacherResult(' + i + ')">清除</button>';
+    } else {
+      html += '<button class="action-btn" onclick="drawTeacher(' + i + ')">抽签</button>';
+    }
+    html += '</td>';
+    html += '</tr>';
+  }
+  
+  html += '</table></div>';
+  container.innerHTML = html;
+}
+
+// 参与者功能
+async function participantJoin() {
+  if (!db) {
+    alert('数据库未初始化，请刷新页面重试');
+    return;
+  }
+  
+  var roomId = document.getElementById('participantRoomId').value.trim();
+  
+  if (!roomId) {
+    alert('请输入房间ID');
+    return;
+  }
+  
+  log('参与者加入房间：' + roomId);
+  
+  var result = await db.from('rooms').select('*').eq('id', roomId).single();
+  
+  if (result.error || !result.data) {
+    alert('房间不存在');
+    return;
+  }
+  
+  currentRoomId = roomId;
+  isAdmin = false;
+  
+  await loadRoomData();
+  showParticipantPage();
+  updateParticipantUI();
+  
+  subscribeToUpdates();
+}
+
+function updateParticipantUI() {
+  document.getElementById('displayParticipantRoomId').textContent = currentRoomId;
+  
+  var select = document.getElementById('teacherSelect');
+  select.innerHTML = '<option value="">-- 请选择您的姓名 --</option>';
+  
+  for (var i = 0; i < teachers.length; i++) {
+    var t = teachers[i];
+    var opt = document.createElement('option');
+    opt.value = t.name;
+    opt.textContent = t.name + (t.subject ? ' (' + t.subject + ')' : '') + (t.drawn ? ' 已抽签' : '');
+    if (t.drawn) opt.style.color = '#4caf50';
+    select.appendChild(opt);
+  }
+  
+  updateParticipantDrawnList();
+}
+
+function updateParticipantDrawnList() {
+  var container = document.getElementById('participantDrawnList');
+  
+  var drawn = teachers.filter(function(t) { return t.drawn; });
+  
+  if (drawn.length === 0) {
+    container.innerHTML = '<p style="color: #aab;">暂无抽签结果</p>';
+    return;
+  }
+  
+  var html = '<div class="table-container"><table>';
+  html += '<tr><th>姓名</th><th>科目</th><th>序号</th><th>班级</th></tr>';
+  
+  for (var i = 0; i < drawn.length; i++) {
+    var t = drawn[i];
+    html += '<tr>';
+    html += '<td>' + t.name + '</td>';
+    html += '<td>' + (t.subject || '-') + '</td>';
+    html += '<td><b style="color:#e94560">' + t.seq + '</b></td>';
+    html += '<td><b style="color:#e94560">' + t.cls + '</b></td>';
+    html += '</tr>';
+  }
+  
+  html += '</table></div>';
+  container.innerHTML = html;
+}
+
+async function participantDraw() {
+  var name = document.getElementById('teacherSelect').value;
+  
+  if (!name) {
+    alert('请选择您的姓名');
+    return;
+  }
+  
+  var teacher = null;
+  for (var i = 0; i < teachers.length; i++) {
+    if (teachers[i].name === name) {
+      teacher = teachers[i];
+      break;
+    }
+  }
+  
+  if (!teacher) {
+    alert('未找到教师信息');
+    return;
+  }
+  
+  if (teacher.drawn) {
+    document.getElementById('participantResult').innerHTML = 
+      '<div class="note-success"><p class="success">您已抽签！</p>' +
+      '<p>序号：<b style="font-size: 28px; color: #e94560;">' + teacher.seq + '</b></p>' +
+      '<p>班级：<b style="font-size: 22px; color: #e94560;">' + teacher.cls + '</b></p></div>';
+    return;
+  }
+  
+  var seq = getAvailableSeq();
+  var gradeNum = teacher.gradeNum || 3;
+  var cls = drawClassFromPool(gradeNum);
+  
+  var result = await db.from('teachers').update({ drawn: true, seq: seq.toString(), cls: cls }).eq('id', teacher.id);
+  
+  if (result.error) {
+    alert('抽签失败：' + result.error.message);
+    return;
+  }
+  
+  teacher.drawn = true;
+  teacher.seq = seq;
+  teacher.cls = cls;
+  usedSeqs.push(seq);
+  
+  document.getElementById('participantResult').innerHTML = 
+    '<div class="note-success"><p class="success" style="font-size: 20px;">抽签完成！</p>' +
+    '<p>姓名：<b>' + teacher.name + '</b></p>' +
+    '<p>序号：<b style="font-size: 36px; color: #e94560;">' + seq + '</b></p>' +
+    '<p>班级：<b style="font-size: 26px; color: #e94560;">' + cls + '</b></p></div>';
+  
+  updateParticipantUI();
+  log(teacher.name + ' 抽签成功：序号' + seq + '，' + cls);
+}
+
+// 抽签逻辑
+function getAvailableSeq() {
+  var maxSeq = teachers.length;
+  var seq = Math.floor(Math.random() * maxSeq) + 1;
+  var attempts = 0;
+  
+  while (usedSeqs.indexOf(seq) !== -1 && attempts < 100) {
+    seq = Math.floor(Math.random() * maxSeq) + 1;
+    attempts++;
+  }
+  
+  if (usedSeqs.indexOf(seq) !== -1) {
+    for (var k = 1; k <= maxSeq; k++) {
+      if (usedSeqs.indexOf(k) === -1) {
+        seq = k;
+        break;
+      }
+    }
+  }
+  
+  return seq;
+}
+
+async function drawTeacher(index) {
+  var teacher = teachers[index];
+  if (teacher.drawn) {
+    alert('该教师已抽签');
+    return;
+  }
+  
+  var seq = getAvailableSeq();
+  var gradeNum = teacher.gradeNum || 3;
+  var cls = drawClassFromPool(gradeNum);
+  
+  var result = await db.from('teachers').update({ drawn: true, seq: seq.toString(), cls: cls }).eq('id', teacher.id);
+  
+  if (result.error) {
+    alert('抽签失败：' + result.error.message);
+    return;
+  }
+  
+  teacher.drawn = true;
+  teacher.seq = seq;
+  teacher.cls = cls;
+  usedSeqs.push(seq);
+  
+  updateAdminResultTable();
+  log(teacher.name + ' 抽签成功：序号' + seq + '，' + cls);
+  alert('抽签完成！\n\n姓名：' + teacher.name + '\n序号：' + seq + '\n班级：' + cls);
+}
+
+async function redrawTeacher(index) {
+  var teacher = teachers[index];
+  
+  var seq = getAvailableSeq();
+  var gradeNum = teacher.gradeNum || 3;
+  var cls = drawClassFromPool(gradeNum);
+  
+  var result = await db.from('teachers').update({ seq: seq.toString(), cls: cls }).eq('id', teacher.id);
+  
+  if (result.error) {
+    alert('重抽失败：' + result.error.message);
+    return;
+  }
+  
+  var oldSeq = parseInt(teacher.seq);
+  var idx = usedSeqs.indexOf(oldSeq);
+  if (idx !== -1) usedSeqs.splice(idx, 1);
+  
+  teacher.seq = seq;
+  teacher.cls = cls;
+  usedSeqs.push(seq);
+  
+  updateAdminResultTable();
+  log(teacher.name + ' 重抽成功：序号' + seq + '，' + cls);
+  alert('重抽完成！\n\n姓名：' + teacher.name + '\n新序号：' + seq + '\n新班级：' + cls);
+}
+
+async function clearTeacherResult(index) {
+  if (!confirm('确定要清除该教师的抽签结果吗？')) return;
+  
+  var teacher = teachers[index];
+  
+  var result = await db.from('teachers').update({ drawn: false, seq: '', cls: '' }).eq('id', teacher.id);
+  
+  if (result.error) {
+    alert('清除失败：' + result.error.message);
+    return;
+  }
+  
+  var oldSeq = parseInt(teacher.seq);
+  var idx = usedSeqs.indexOf(oldSeq);
+  if (idx !== -1) usedSeqs.splice(idx, 1);
+  
+  teacher.drawn = false;
+  teacher.seq = '';
+  teacher.cls = '';
+  
+  updateAdminResultTable();
+  log('已清除 ' + teacher.name + ' 的抽签结果');
+}
+
+async function startDraw() {
+  for (var i = 0; i < teachers.length; i++) {
+    if (!teachers[i].drawn) {
+      await drawTeacher(i);
+      return;
+    }
+  }
+  alert('所有教师已抽签完成');
+}
+
+async function redraw() {
+  if (teachers.filter(function(t) { return !t.drawn; }).length === 0) {
+    alert('所有教师已抽签完成');
+    return;
+  }
+  await startDraw();
+}
+
+async function resetAll() {
+  if (!confirm('确定要重置所有抽签结果吗？此操作不可恢复！')) return;
+  
+  var result = await db.from('teachers').update({ drawn: false, seq: '', cls: '' }).eq('room_id', currentRoomId);
+  
+  if (result.error) {
+    alert('重置失败：' + result.error.message);
+    return;
+  }
+  
+  for (var i = 0; i < teachers.length; i++) {
+    teachers[i].drawn = false;
+    teachers[i].seq = '';
+    teachers[i].cls = '';
+  }
+  
+  usedSeqs = [];
+  
+  updateAdminResultTable();
+  log('已重置所有抽签结果');
+  alert('已重置所有抽签结果');
+}
+
+// 花名册管理
+async function saveRoster() {
+  var text = document.getElementById('roster').value.trim();
+  if (!text) {
+    alert('请输入花名册');
+    return;
+  }
+  
+  gradeClassCount = {
+    1: parseInt(document.getElementById('g1').value) || 2,
+    2: parseInt(document.getElementById('g2').value) || 2,
+    3: parseInt(document.getElementById('g3').value) || 3,
+    4: parseInt(document.getElementById('g4').value) || 3,
+    5: parseInt(document.getElementById('g5').value) || 3,
+    6: parseInt(document.getElementById('g6').value) || 2
+  };
+  
+  classPools = {};
+  for (var g = 1; g <= 6; g++) {
+    initClassPool(g);
+  }
+  
+  var lines = text.split('\n');
+  var newTeachers = [];
+  
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    
+    var fixedLine = line.replace(/，/g, ',');
+    var parts = fixedLine.split(',');
+    
+    if (parts[0] && parts[0].trim()) {
+      newTeachers.push({
+        room_id: currentRoomId,
+        name: parts[0].trim(),
+        subject: parts[1] ? parts[1].trim() : '',
+        grade: parts[2] ? parts[2].trim() : '',
+        drawn: false,
+        seq: '',
+        cls: ''
+      });
+    }
+  }
+  
+  if (newTeachers.length === 0) {
+    alert('花名册格式错误');
+    return;
+  }
+  
+  await db.from('teachers').delete().eq('room_id', currentRoomId);
+  
+  var result = await db.from('teachers').insert(newTeachers);
+  
+  if (result.error) {
+    alert('保存失败：' + result.error.message);
+    return;
+  }
+  
+  await loadRoomData();
+  updateAdminResultTable();
+  log('保存成功，共 ' + newTeachers.length + ' 位教师');
+  alert('保存成功！\n共 ' + newTeachers.length + ' 位教师');
+}
+
+async function clearRoster() {
+  if (!confirm('确定要清空花名册吗？')) return;
+  
+  await db.from('teachers').delete().eq('room_id', currentRoomId);
+  
+  document.getElementById('roster').value = '';
+  teachers = [];
+  usedSeqs = [];
+  
+  updateAdminResultTable();
+  log('已清空花名册');
+}
+
+// 导入导出
+function downloadTemplate() {
+  var data = [
+    ['姓名', '科目', '年级'],
+    ['张三', '语文', '三年级'],
+    ['李四', '数学', '四年级']
+  ];
+  var ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '教师花名册');
+  XLSX.writeFile(wb, '教师花名册模板.xlsx');
+}
+
+function importTeachers(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var data = new Uint8Array(e.target.result);
+    var workbook = XLSX.read(data, { type: 'array' });
+    var firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    var jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+    
+    var lines = [];
+    for (var i = 0; i < jsonData.length; i++) {
+      var row = jsonData[i];
+      if (!row || row.length === 0) continue;
+      if (i === 0 && row[0] && row[0].toString().indexOf('姓名') !== -1) continue;
+      
+      var name = row[0] ? row[0].toString().trim() : '';
+      var subject = row[1] ? row[1].toString().trim() : '';
+      var grade = row[2] ? row[2].toString().trim() : '';
+      
+      if (name) {
+        lines.push(name + ',' + subject + ',' + grade);
+      }
+    }
+    
+    document.getElementById('roster').value = lines.join('\n');
+    alert('导入成功！\n共 ' + lines.length + ' 条数据');
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = '';
+}
+
+function exportResults() {
+  if (teachers.length === 0) {
+    alert('暂无数据');
+    return;
+  }
+  
+  var data = [['序号', '姓名', '科目', '年级', '抽签序号', '班级']];
+  
+  var sorted = teachers.slice().sort(function(a, b) {
+    if (!a.seq && !b.seq) return 0;
+    if (!a.seq) return 1;
+    if (!b.seq) return -1;
+    return parseInt(a.seq) - parseInt(b.seq);
+  });
+  
+  for (var i = 0; i < sorted.length; i++) {
+    var t = sorted[i];
+    data.push([i + 1, t.name, t.subject || '', t.gradeStr || '', t.seq || '', t.cls || '']);
+  }
+  
+  var ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 6 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 15 }];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '抽签结果');
+  XLSX.writeFile(wb, '抽签结果.xlsx');
+}
+
+// 实时订阅
+function subscribeToUpdates() {
+  db.channel('teachers_changes')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'teachers',
+      filter: 'room_id=eq.' + currentRoomId
+    }, async function(payload) {
+      log('收到更新通知');
+      await loadRoomData();
+      if (isAdmin) {
+        updateAdminResultTable();
+      } else {
+        updateParticipantUI();
+      }
+    })
+    .subscribe();
+}
+
+function copyShareLink() {
+  var link = document.getElementById('shareLink').textContent;
+  navigator.clipboard.writeText(link).then(function() {
+    alert('链接已复制！\n\n' + link);
+  });
+}
+
+function shareToWechat() {
+  var shareUrl = document.getElementById('shareLink').textContent;
+  
+  // 生成二维码弹窗
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10000;';
+  
+  var content = document.createElement('div');
+  content.style.cssText = 'background:white;padding:25px;border-radius:12px;text-align:center;max-width:360px;color:#333;';
+  
+  content.innerHTML = '<h3 style="margin:0 0 15px;color:#e94560;font-size:18px;">📡 分享抽签房间</h3>' +
+    '<p style="font-size:14px;color:#666;margin-bottom:15px;">让抽签人用微信扫一扫</p>' +
+    '<div id="qrImg" style="display:flex;justify-content:center;margin:10px 0;"></div>' +
+    '<p style="font-size:13px;color:#999;margin:10px 0 15px;word-break:break-all;background:#f5f5f5;padding:8px;border-radius:6px;">' + shareUrl + '</p>' +
+    '<div style="display:flex;gap:10px;justify-content:center;">' +
+    '<button id="copyShareBtn" style="padding:10px 20px;background:#4a90a4;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">📋 复制链接</button>' +
+    '<button id="saveQrBtn" style="padding:10px 20px;background:#e94560;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">💾 保存二维码</button>' +
+    '<button id="closeShareBtn" style="padding:10px 20px;background:#999;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">关闭</button>' +
+    '</div>';
+  
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  
+  // 用 Google QR Code API 生成二维码图片
+  var qrApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(shareUrl);
+  document.getElementById('qrImg').innerHTML = '<img src="' + qrApiUrl + '" style="width:200px;height:200px;" alt="二维码">';
+  
+  document.getElementById('closeShareBtn').onclick = function() { modal.remove(); };
+  
+  document.getElementById('copyShareBtn').onclick = function() {
+    navigator.clipboard.writeText(shareUrl).then(function() {
+      var btn = document.getElementById('copyShareBtn');
+      btn.textContent = '✅ 已复制';
+      btn.style.background = '#4caf50';
+      setTimeout(function() { btn.textContent = '📋 复制链接'; btn.style.background = '#4a90a4'; }, 2000);
+    });
+  };
+  
+  document.getElementById('saveQrBtn').onclick = function() {
+    var img = document.querySelector('#qrImg img');
+    if (img) {
+      var a = document.createElement('a');
+      a.href = img.src;
+      a.download = '抽签房间二维码.png';
+      a.click();
+    }
+  };
+}
+
+// 初始化
+window.onload = function() {
+  initSupabase();
+  
+  var urlParams = new URLSearchParams(window.location.search);
+  var roomParam = urlParams.get('room');
+  if (roomParam) {
+    document.getElementById('participantRoomId').value = roomParam;
+    showParticipantJoin();
+  }
+  
+  log('系统启动完成');
+};
+</script>
+
+</body>
+</html>
