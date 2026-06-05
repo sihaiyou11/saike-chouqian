@@ -68,8 +68,8 @@ tr:hover { background: rgba(255,255,255,0.05); }
   <!-- 管理员登录 -->
   <div id="adminLoginPage" class="box hidden">
     <h3>管理员登录</h3>
-    <label>房间ID（已有房间请输入，留空则创建新房间）</label>
-    <input type="text" id="adminRoomId" placeholder="留空则创建新房间">
+    <label>房间ID（输入房间名加入已有房间，或输入新名称创建房间）</label>
+    <input type="text" id="adminRoomId" placeholder="例如：三年级语文组">
     <label>管理员密码</label>
     <input type="password" id="adminToken" placeholder="创建或管理房间需要密码">
     <div class="btn-group">
@@ -294,7 +294,27 @@ async function adminLogin() {
     var result = await db.from('rooms').select('*').eq('id', roomId).single();
     
     if (result.error || !result.data) {
-      alert('房间不存在');
+      // 房间不存在，用此名称创建新房间
+      var newRoomId = roomId;
+      var insertResult = await db.from('rooms').insert({
+        id: newRoomId,
+        name: '赛课抽签',
+        admin_token: token,
+        seq_input: '1,2,3,4,5,6,7,8,9,10',
+        class_input: ''
+      });
+      if (insertResult.error) {
+        alert('创建房间失败：' + insertResult.error.message);
+        return;
+      }
+      currentRoomId = newRoomId;
+      currentToken = token;
+      isAdmin = true;
+      teachers = [];
+      showAdminPage();
+      updateAdminUI();
+      log('房间创建成功：' + newRoomId);
+      alert('房间创建成功！\n房间ID：' + newRoomId + '\n\n请保存房间ID和密码，用于后续管理');
       return;
     }
     
